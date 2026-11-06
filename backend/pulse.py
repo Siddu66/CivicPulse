@@ -4,6 +4,7 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 from dotenv import load_dotenv
 from supabase import create_client, Client
+import uuid
 
 load_dotenv()
 
@@ -83,26 +84,67 @@ from flask import request
 @app.route("/api/complaints", methods=["POST"])
 def create_complaint():
     if supabase is None:
-        return jsonify({"success": False, "error": "Database not connected"}), 500
+        return jsonify({
+            "success": False,
+            "error": "Database not connected"
+        }), 500
 
-    data = request.get_json(silent=True) or {}
+    data = request.form if request.form else (
+        request.get_json(silent=True) or {}
+    )
 
     title = data.get("title")
     description = data.get("description")
     category = data.get("category")
+    location = data.get("location")
 
     if not title or not description:
-     return jsonify({
-        "success": False,
-        "error": "Title and description are required"
-    }), 400
+        return jsonify({
+            "success": False,
+            "error": "Title and description are required"
+        }), 400
+
+    image_url = None
+    image = request.files.get("image")
 
     try:
+        if image and image.filename:
+            allowed_types = {
+                "image/jpeg": ".jpg",
+                "image/png": ".png",
+                "image/webp": ".webp"
+            }
+
+            if image.mimetype not in allowed_types:
+                return jsonify({
+                    "success": False,
+                    "error": "Only JPG, PNG and WEBP images are allowed"
+                }), 400
+
+            file_path = (
+                f"{uuid.uuid4().hex}"
+                f"{allowed_types[image.mimetype]}"
+            )
+
+            bucket = supabase.storage.from_("complaint-images")
+
+            bucket.upload(
+                file_path,
+                image.read(),
+                file_options={
+                    "content-type": image.mimetype,
+                    "upsert": "false"
+                }
+            )
+
+            image_url = bucket.get_public_url(file_path)
+
         response = supabase.table("complaints").insert({
             "title": title,
             "description": description,
             "category": category or None,
-            "location": data.get("location")
+            "location": location,
+            "image_url": image_url
         }).execute()
 
         return jsonify({
@@ -116,6 +158,8 @@ def create_complaint():
             "success": False,
             "error": str(e)
         }), 500
+
+
 
 @app.route("/api/complaints/<int:complaint_id>/ai-suggestion", methods=["POST"])
 def save_ai_suggestion(complaint_id):
