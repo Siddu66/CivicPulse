@@ -1,61 +1,193 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import NotificationDropdown from './NotificationDropdown';
+
+import React, { useEffect, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
 
 export default function Navbar() {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const [role, setRole] = useState('');
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadRole = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user || !active) {
+        if (active) setRole('');
+        return;
+      }
+
+      const { data } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (active) setRole(data?.role || '');
+    };
+
+    loadRole();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(() => {
+      loadRole();
+    });
+
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
+  }, [location.pathname]);
+
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [location.pathname]);
+
+  const logout = async () => {
+    await supabase.auth.signOut();
+    setRole('');
+    setMenuOpen(false);
+    navigate('/roles');
+  };
+
+  const isAdministrator =
+    role === 'administrator' ||
+    location.pathname.startsWith('/administrator');
+
+  const isAdmin =
+    role === 'admin' ||
+    location.pathname.startsWith('/admin/');
+
+  const navLink =
+    'rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-blue-50 hover:text-blue-700';
+
+  const activeLink =
+    'rounded-lg bg-blue-50 px-3 py-2 text-sm font-bold text-blue-700';
+
+  const linkClass = (path) =>
+    location.pathname === path ? activeLink : navLink;
 
   return (
-    <nav className="bg-white border-b border-slate-100 px-6 py-3.5 sticky top-0 z-40 shadow-xs">
-      <div className="max-w-7xl mx-auto flex justify-between items-center">
-        
-        {/* Brand */}
-        <Link to="/home" className="flex items-center space-x-2">
-          <span className="text-2xl font-black text-blue-600 tracking-tight">CivicPulse</span>
-          <span className="text-[10px] bg-slate-100 text-slate-500 font-bold px-2 py-0.5 rounded-full uppercase">v1.0</span>
+    <nav className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/95 shadow-sm backdrop-blur">
+      <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
+
+        <Link to="/" className="flex items-center gap-3">
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 text-xl font-extrabold text-white shadow-md">
+            C
+          </span>
+
+          <span className="text-xl font-extrabold tracking-tight text-slate-900">
+            Civic<span className="text-blue-600">Pulse</span>
+            <span className="hidden text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400 sm:block">
+              Community action platform
+            </span>
+          </span>
         </Link>
 
-        {/* Desktop Nav Links */}
-        <div className="hidden md:flex space-x-6 text-sm font-semibold text-slate-600 items-center">
-          <Link to="/home" className="hover:text-blue-600 transition">Home</Link>
-          <Link to="/" className="hover:text-blue-600 transition">Track Issues</Link>
-          <Link to="/report" className="hover:text-blue-600 transition">Report Issue</Link>
-          <Link to="/verify" className="hover:text-blue-600 transition">Verify Resolution</Link>
-          <Link to="/emergency" className="bg-red-600 text-white px-3 py-1.5 rounded-xl hover:bg-red-700 transition flex items-center space-x-1 shadow-xs">
-            <span>🚨 Emergency</span>
-          </Link>
-          <Link to="/admin/dashboard" className="text-indigo-600 font-bold hover:underline">Admin Portal</Link>
-        </div>
-
-        {/* Action Utility (Notifications + Auth) */}
-        <div className="hidden md:flex items-center space-x-3">
-          <NotificationDropdown />
-          <Link to="/auth" className="bg-blue-600 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:bg-blue-700 transition shadow-sm">
-            Sign In / Register
-          </Link>
-        </div>
-
-        {/* Mobile Hamburger Toggle */}
         <button
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="md:hidden p-2 text-slate-600 focus:outline-none"
+          type="button"
+          onClick={() => setMenuOpen((open) => !open)}
+          className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 md:hidden"
+          aria-label="Toggle navigation menu"
+          aria-expanded={menuOpen}
         >
-          {mobileMenuOpen ? '✖' : '☰'}
+          {menuOpen ? '✕ Close' : '☰ Menu'}
         </button>
-      </div>
 
-      {/* Mobile Drawer Menu */}
-      {mobileMenuOpen && (
-        <div className="md:hidden pt-4 pb-2 space-y-3 border-t border-slate-100 mt-3 text-sm font-semibold text-slate-700 flex flex-col">
-          <Link to="/home" onClick={() => setMobileMenuOpen(false)}>Home</Link>
-          <Link to="/" onClick={() => setMobileMenuOpen(false)}>Track Issues</Link>
-          <Link to="/report" onClick={() => setMobileMenuOpen(false)}>Report Issue</Link>
-          <Link to="/verify" onClick={() => setMobileMenuOpen(false)}>Verify Resolution</Link>
-          <Link to="/emergency" onClick={() => setMobileMenuOpen(false)} className="text-red-600 font-bold">🚨 Emergency</Link>
-          <Link to="/admin/dashboard" onClick={() => setMobileMenuOpen(false)} className="text-indigo-600 font-bold">Admin Portal</Link>
-          <Link to="/auth" onClick={() => setMobileMenuOpen(false)} className="text-blue-600 font-bold">Sign In / Register</Link>
+        <div
+          className={`${menuOpen ? 'flex' : 'hidden'
+            } absolute left-0 right-0 top-full flex-col gap-2 border-b border-slate-200 bg-white p-4 shadow-lg md:static md:flex md:flex-row md:items-center md:justify-end md:border-0 md:bg-transparent md:p-0 md:shadow-none`}
+        >
+          {isAdministrator ? (
+            <>
+              <span className="px-3 py-2 text-sm font-semibold text-slate-600">
+                Administrator Portal
+              </span>
+
+              <span className="w-fit rounded-full bg-violet-100 px-3 py-1.5 text-xs font-bold text-violet-700">
+                Administrator
+              </span>
+
+              <button
+                onClick={logout}
+                className="rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-bold text-white hover:bg-slate-700"
+              >
+                Sign Out
+              </button>
+            </>
+          ) : isAdmin ? (
+            <>
+              <span className="px-3 py-2 text-sm font-semibold text-slate-600">
+                Resolution Company Portal
+              </span>
+
+              <span className="w-fit rounded-full bg-blue-100 px-3 py-1.5 text-xs font-bold text-blue-700">
+                Admin
+              </span>
+
+              <button
+                onClick={logout}
+                className="rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-bold text-white hover:bg-slate-700"
+              >
+                Sign Out
+              </button>
+            </>
+          ) : (
+            <>
+              <Link
+                to="/citizen/dashboard"
+                className={linkClass('/citizen/dashboard')}
+              >
+                Home
+              </Link>
+
+              <Link
+                to="/track"
+                className={linkClass('/track')}
+              >
+                Track Issues
+              </Link>
+
+              <Link
+                to="/report"
+                className={linkClass('/report')}
+              >
+                Report Issue
+              </Link>
+
+              <Link
+                to="/verify"
+                className={linkClass('/verify')}
+              >
+                Verify Resolution
+              </Link>
+
+              {role === 'citizen' ? (
+                <button
+                  onClick={logout}
+                  className="rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-bold text-white hover:bg-slate-700"
+                >
+                  Sign Out
+                </button>
+              ) : (
+                <Link
+                  to="/roles"
+                  className="rounded-xl bg-blue-600 px-5 py-2.5 text-center text-sm font-bold text-white shadow-sm hover:bg-blue-700"
+                >
+                  Sign In / Register
+                </Link>
+              )}
+            </>
+          )}
         </div>
-      )}
+      </div>
     </nav>
   );
 }

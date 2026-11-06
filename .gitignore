@@ -30,3 +30,4 @@ venv/
 .venv/
 /backend/.env
 /backend/venv/
+.env

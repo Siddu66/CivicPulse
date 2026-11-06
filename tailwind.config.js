@@ -1,9 +1,15 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-  content: [],
+  content: [
+    "./index.html",
+    "./src/**/*.{js,ts,jsx,tsx}",
+  ],
   theme: {
-    extend: {},
+    extend: {
+      boxShadow: {
+        card: "0 8px 25px rgba(15, 23, 42, 0.06)",
+      },
+    },
   },
   plugins: [],
-}
-
+};
